@@ -46,6 +46,16 @@ Even a one-pixel change in an image or one character in a PDF produces a complet
 - **Hashing:** [crypto-js](https://github.com/brix/crypto-js) SHA-256 on raw file binaries.
 - **UI:** React + Tailwind CSS, installable as a PWA. Can be wrapped for Android with [Capacitor](https://capacitorjs.com/).
 
+### IndexedDB Resilience
+
+The app includes automatic recovery for IndexedDB errors that can occur in some browsers (notably Chrome and Safari on mobile):
+
+- **Startup initialization** — The database is opened before the UI renders to avoid race conditions.
+- **Retry with backoff** — If a `DatabaseClosedError` or `UnknownError` occurs (e.g., after the app was in the background), the app automatically closes the connection, waits briefly, reopens, and retries the operation.
+- **User guidance** — If recovery fails, a toast suggests reloading the app.
+
+These errors are often caused by browser extensions (e.g. SES/lockdown, ad blockers, or privacy tools), memory pressure, or the app returning from the background. If they persist, try reloading the page, using an incognito/private window without extensions, or temporarily disabling extensions that modify page scripts.
+
 ---
 
 ## Quick Start (Web)
@@ -139,7 +149,7 @@ Everything is stored in your browser’s IndexedDB. It stays on the device. No c
 
 ### What happens if I clear my browser data?
 
-The vault is cleared. This is a local-only tool. For long-term retention, consider periodic exports (e.g., CSV of hashes) or backup strategies you control.
+The vault is cleared. This is a local-only tool. Use **Export CSV** in the Verification Hub to back up your records, and **Import CSV** to restore them on another device or after clearing data.
 
 ### Can this run without internet?
 

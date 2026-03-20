@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -16,13 +16,68 @@ import {
   User,
   ShieldAlert
 } from 'lucide-react';
-import { db } from './db/evidenceVault';
+import { storage, retryIndexedDB } from './db/storage';
 import { hashFile } from './utils/hashFile';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 function cn(...inputs) {
   return twMerge(clsx(...inputs));
+}
+
+function toCsvValue(value) {
+  const raw = value == null ? '' : String(value);
+  const escaped = raw.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+function parseCsvLine(line, delimiter = ',') {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === delimiter && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current);
+  return result;
+}
+
+function normalizeHeader(value) {
+  return (value || '')
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+}
+
+function detectCsvDelimiter(line) {
+  const commaCount = (line.match(/,/g) || []).length;
+  const semicolonCount = (line.match(/;/g) || []).length;
+  return semicolonCount > commaCount ? ';' : ',';
+}
+
+function parseTimestamp(value) {
+  const raw = (value || '').trim();
+  if (!raw) return NaN;
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) return numeric;
+  const parsedDate = Date.parse(raw);
+  return Number.isFinite(parsedDate) ? parsedDate : NaN;
 }
 
 const ACCEPTED_TYPES = {
@@ -81,7 +136,7 @@ function ScanView({ onTabChange, onSuccess }) {
     setIsSubmitting(true);
     try {
       const hash = await hashFile(file);
-      await db.documents.add({
+      await storage.documents.add({
         fileName: file.name,
         hash,
         timestamp: Date.now(),
@@ -198,14 +253,111 @@ function VerifyView({ onTabChange }) {
   const [documents, setDocuments] = useState([]);
   const [verificationResult, setVerificationResult] = useState(null);
   const [isHashing, setIsHashing] = useState(false);
+  const [toast, setToast] = useState(null);
+  const importInputRef = useRef(null);
 
   const loadDocs = useCallback(async () => {
-    const list = await db.documents.orderBy('timestamp').reverse().toArray();
+    const list = await storage.documents.orderBy('timestamp').reverse().toArray();
     setDocuments(list);
   }, []);
 
   useEffect(() => {
-    loadDocs();
+    loadDocs().catch(() => {
+      setToast({ message: 'Could not load vault. Please reload the app.', type: 'error' });
+    });
+  }, [loadDocs]);
+
+  const handleExportCsv = useCallback(() => {
+    if (!documents.length) {
+      setToast({ message: 'Vault is empty. Nothing to export.', type: 'error' });
+      return;
+    }
+
+    const header = ['fileName', 'hash', 'timestamp', 'officerId'];
+    const lines = documents.map((doc) => [
+      toCsvValue(doc.fileName),
+      toCsvValue(doc.hash),
+      toCsvValue(doc.timestamp),
+      toCsvValue(doc.officerId),
+    ].join(','));
+
+    const csv = [header.join(','), ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vault-backup-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setToast({ message: 'CSV backup exported successfully.', type: 'success' });
+  }, [documents]);
+
+  const handleImportCsv = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const rows = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      if (rows.length < 2) {
+        setToast({ message: 'CSV has no data rows.', type: 'error' });
+        return;
+      }
+
+      const delimiter = detectCsvDelimiter(rows[0]);
+      const header = parseCsvLine(rows[0], delimiter).map(normalizeHeader);
+      const required = ['filename', 'hash', 'timestamp', 'officerid'];
+      const hasAll = required.every((field) => header.includes(field));
+      if (!hasAll) {
+        setToast({ message: 'Invalid CSV format. Missing required columns.', type: 'error' });
+        return;
+      }
+
+      const col = {
+        fileName: header.indexOf('filename'),
+        hash: header.indexOf('hash'),
+        timestamp: header.indexOf('timestamp'),
+        officerId: header.indexOf('officerid'),
+      };
+
+      const existing = await storage.documents.toArray();
+      const existingHashes = new Set(existing.map((d) => d.hash));
+      const toInsert = [];
+
+      for (let i = 1; i < rows.length; i += 1) {
+        const values = parseCsvLine(rows[i], delimiter);
+        const fileName = values[col.fileName]?.trim();
+        const hash = values[col.hash]?.trim();
+        const timestampRaw = values[col.timestamp]?.trim();
+        const officerId = values[col.officerId]?.trim();
+        const timestamp = parseTimestamp(timestampRaw);
+
+        if (!fileName || !hash || !officerId || !Number.isFinite(timestamp)) continue;
+        if (existingHashes.has(hash)) continue;
+
+        toInsert.push({ fileName, hash, timestamp, officerId });
+        existingHashes.add(hash);
+      }
+
+      if (!toInsert.length) {
+        setToast({ message: 'No new hashes found to import.', type: 'error' });
+        return;
+      }
+
+      await storage.documents.bulkAdd(toInsert);
+      await loadDocs();
+      setToast({ message: `Imported ${toInsert.length} record(s) from CSV.`, type: 'success' });
+    } catch {
+      setToast({ message: 'Failed to import CSV backup. Try reloading app and importing again.', type: 'error' });
+    } finally {
+      event.target.value = '';
+    }
   }, [loadDocs]);
 
   const onDrop = useCallback(async (acceptedFiles) => {
@@ -335,9 +487,32 @@ function VerifyView({ onTabChange }) {
         </div>
 
         <div className="lg:col-span-5 space-y-4 w-full">
-          <div className="flex items-center justify-between px-2">
+          <div className="flex items-center justify-between gap-3 px-2">
             <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Vault Records</h3>
             <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">{documents.length} Total</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 px-2">
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="btn-secondary py-2 px-3 text-xs"
+            >
+              Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              className="btn-secondary py-2 px-3 text-xs"
+            >
+              Import CSV
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={handleImportCsv}
+            />
           </div>
           
           <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
@@ -379,16 +554,69 @@ function VerifyView({ onTabChange }) {
           </div>
         </div>
       </div>
+      <AnimatePresence>
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      </AnimatePresence>
     </motion.div>
+  );
+}
+
+function StorageBanner({ onRetry }) {
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    try {
+      const ok = await retryIndexedDB();
+      if (ok) window.location.reload();
+      else onRetry?.();
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  return (
+    <div className="bg-amber-500/95 text-amber-950 px-4 py-3 flex flex-wrap items-center justify-center gap-3 text-sm font-semibold">
+      <AlertTriangle size={18} className="shrink-0" />
+      <span>
+        Storage blocked—using temporary mode. Data is lost on refresh.
+        <span className="hidden sm:inline"> Try incognito or disable extensions.</span>
+      </span>
+      <button
+        type="button"
+        onClick={handleRetry}
+        disabled={isRetrying}
+        className="shrink-0 px-4 py-1.5 bg-amber-900 text-amber-50 rounded-lg hover:bg-amber-800 disabled:opacity-60 transition-colors"
+      >
+        {isRetrying ? 'Retrying…' : 'Retry persistent storage'}
+      </button>
+    </div>
   );
 }
 
 export default function App() {
   const [tab, setTab] = useState('scan');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [retryToast, setRetryToast] = useState(null);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#fcfdff] selection:bg-indigo-100 selection:text-indigo-900">
+      {!storage.isPersistent && (
+        <StorageBanner
+          onRetry={() =>
+            setRetryToast({ message: 'Persistent storage still unavailable. Try incognito or disable extensions.', type: 'error' })
+          }
+        />
+      )}
+      <AnimatePresence>
+        {retryToast && (
+          <Toast
+            message={retryToast.message}
+            type={retryToast.type}
+            onClose={() => setRetryToast(null)}
+          />
+        )}
+      </AnimatePresence>
       {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="hidden sm:block absolute -top-24 -left-24 w-96 h-96 bg-indigo-100/30 rounded-full blur-[100px]" />
