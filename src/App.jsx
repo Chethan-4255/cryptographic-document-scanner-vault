@@ -42,7 +42,7 @@ function Toast({ message, type, onClose }) {
       animate={{ opacity: 1, y: 0, x: '-50%' }}
       exit={{ opacity: 0, y: 20, x: '-50%' }}
       className={cn(
-        "fixed bottom-8 left-1/2 z-50 px-6 py-4 rounded-2xl shadow-2xl font-semibold flex items-center gap-3 min-w-[320px] backdrop-blur-xl border-t border-white/20",
+        "fixed bottom-8 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-md px-6 py-4 rounded-2xl shadow-2xl font-semibold flex items-center gap-3 backdrop-blur-xl border-t border-white/20",
         type === 'success' ? 'bg-emerald-600/90 text-white' : 'bg-rose-600/90 text-white'
       )}
     >
@@ -242,13 +242,13 @@ function VerifyView({ onTabChange }) {
       exit={{ opacity: 0, y: -20 }}
       className="space-y-10"
     >
-      <div className="flex justify-between items-center bg-white p-4 -mx-4 rounded-3xl sm:mx-0 shadow-sm border border-slate-100">
-        <div className="flex items-center gap-4">
+      <div className="flex justify-between items-center gap-3 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
             <Search size={24} />
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Verification Hub</h2>
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 truncate">Verification Hub</h2>
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Doc Integrity Check</p>
           </div>
         </div>
@@ -386,7 +386,7 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
-    <div className="min-h-screen bg-[#fcfdff] selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="min-h-screen overflow-x-hidden bg-[#fcfdff] selection:bg-indigo-100 selection:text-indigo-900">
       {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-100/30 rounded-full blur-[100px]" />
