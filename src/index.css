@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl shadow-slate-200/50 rounded-2xl;
+  }
+  
+  .btn-primary {
+    @apply bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg shadow-indigo-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  
+  .btn-secondary {
+    @apply bg-white border border-slate-200 text-slate-700 font-semibold py-3 px-6 rounded-xl transition-all duration-300 hover:bg-slate-50 active:scale-95 shadow-sm;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none;
+  }
+
+  .dropzone {
+    @apply border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 bg-slate-50/50 hover:bg-white hover:border-indigo-400;
+  }
+
+  .dropzone-active {
+    @apply border-indigo-500 bg-indigo-50/50 ring-4 ring-indigo-500/10;
+  }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
