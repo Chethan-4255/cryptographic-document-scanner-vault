@@ -389,8 +389,8 @@ export default function App() {
     <div className="min-h-screen overflow-x-hidden bg-[#fcfdff] selection:bg-indigo-100 selection:text-indigo-900">
       {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-100/30 rounded-full blur-[100px]" />
-        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-emerald-100/30 rounded-full blur-[100px]" />
+        <div className="hidden sm:block absolute -top-24 -left-24 w-96 h-96 bg-indigo-100/30 rounded-full blur-[100px]" />
+        <div className="hidden sm:block absolute -bottom-24 -right-24 w-96 h-96 bg-emerald-100/30 rounded-full blur-[100px]" />
       </div>
 
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100">
