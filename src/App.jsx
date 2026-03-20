@@ -255,15 +255,15 @@ function VerifyView({ onTabChange }) {
         <button
           type="button"
           onClick={() => onTabChange('scan')}
-          className="p-3 hover:bg-slate-50 text-slate-500 rounded-2xl transition-colors border border-transparent hover:border-slate-200"
+          className="p-3 shrink-0 hover:bg-slate-50 text-slate-500 rounded-2xl transition-colors border border-transparent hover:border-slate-200"
           title="Back to Scan"
         >
           <X size={24} />
         </button>
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-8 items-start">
-        <div className="lg:col-span-7 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full">
+        <div className="lg:col-span-7 space-y-6 w-full">
           <div 
             {...getRootProps()}
             className={cn(
@@ -279,11 +279,13 @@ function VerifyView({ onTabChange }) {
                    {isHashing ? <Loader2 className="animate-spin" size={40} /> : <ShieldCheck size={40} />}
                 </div>
               </div>
-              <div className="space-y-2 mt-4">
-                <h3 className="text-xl font-bold text-slate-800">
+              <div className="space-y-2 mt-4 w-full max-w-xs sm:max-w-sm px-2 text-center">
+                <h3 className="text-xl font-bold text-slate-800 break-words">
                   {isDragActive ? 'Release to verify' : 'Drop file to verify'}
                 </h3>
-                <p className="text-slate-500 font-medium">Auto-scans and matches against vault records</p>
+                <p className="text-slate-500 font-medium text-sm sm:text-base break-words">
+                  Auto-scans and matches against vault records
+                </p>
               </div>
             </div>
           </div>
@@ -320,7 +322,7 @@ function VerifyView({ onTabChange }) {
                       HASH: {verificationResult.hash}
                     </p>
                     {verificationResult.verified && (
-                      <p className="text-emerald-700 font-bold flex items-center gap-2">
+                      <p className="text-emerald-700 font-bold flex items-center gap-2 break-all">
                         <CheckCircle2 size={16} />
                         Matches Logged: {verificationResult.matchedDoc?.fileName}
                       </p>
@@ -332,7 +334,7 @@ function VerifyView({ onTabChange }) {
           </AnimatePresence>
         </div>
 
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-5 space-y-4 w-full">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Vault Records</h3>
             <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">{documents.length} Total</span>
@@ -417,6 +419,36 @@ export default function App() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-12 relative z-10">
+        <div className="mb-8 flex items-center justify-center">
+          <div className="inline-flex bg-white rounded-2xl p-1 border border-slate-200 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setTab('scan')}
+              className={cn(
+                "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors",
+                tab === 'scan'
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100"
+              )}
+            >
+              <Upload size={16} />
+              Upload
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('verify')}
+              className={cn(
+                "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors",
+                tab === 'verify'
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100"
+              )}
+            >
+              <Search size={16} />
+              Verify
+            </button>
+          </div>
+        </div>
         <AnimatePresence mode="wait">
           {tab === 'scan' ? (
             <ScanView key={`scan-${refreshKey}`} onTabChange={setTab} onSuccess={() => setRefreshKey((k) => k + 1)} />
